@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useCRM } from '../context/CRMContext'
 import { X } from 'lucide-react'
 

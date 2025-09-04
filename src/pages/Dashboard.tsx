@@ -1,8 +1,7 @@
-import React from 'react'
 import { DashboardWidget } from '../components/DashboardWidget'
 import { useCRM } from '../context/CRMContext'
-import { Users, MessageCircle, CheckSquare, TrendingUp, Calendar, AlertCircle } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { Users, MessageCircle, CheckSquare, TrendingUp, AlertCircle } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { format, subDays, startOfDay } from 'date-fns'
 
 export function Dashboard() {

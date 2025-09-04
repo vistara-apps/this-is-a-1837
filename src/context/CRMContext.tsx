@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { Contact, Interaction, Task, User, DashboardStats } from '../types'
 import { contactsAPI, interactionsAPI, tasksAPI, userAPI, APIError } from '../services/api'
 import { useAuth } from '../hooks/useAuth'

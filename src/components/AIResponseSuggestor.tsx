@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Bot, Send, Loader } from 'lucide-react'
 import OpenAI from 'openai'
 

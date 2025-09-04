@@ -1,13 +1,14 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useCRM } from '../context/CRMContext'
 import { TaskScheduler } from '../components/TaskScheduler'
 import { Plus, Search, Filter, Calendar, CheckCircle, Circle, Clock, AlertCircle } from 'lucide-react'
 import { format, isToday, isTomorrow, isPast } from 'date-fns'
+import { Task } from '../types'
 
 export function Tasks() {
   const { tasks, contacts, updateTask, deleteTask } = useCRM();
   const [showForm, setShowForm] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
@@ -39,7 +40,7 @@ export function Tasks() {
     updateTask(taskId, { completed });
   };
 
-  const handleEdit = (task) => {
+  const handleEdit = (task: Task) => {
     setEditingTask(task);
     setShowForm(true);
   };

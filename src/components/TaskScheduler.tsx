@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useCRM } from '../context/CRMContext'
 import { X } from 'lucide-react'
 import { Task } from '../types'
