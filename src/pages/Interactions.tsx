@@ -1,11 +1,11 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useCRM } from '../context/CRMContext'
 import { InteractionLog } from '../components/InteractionLog'
 import { Plus, Search, Filter, Phone, Mail, Calendar, MessageSquare } from 'lucide-react'
 import { format } from 'date-fns'
 
 export function Interactions() {
-  const { interactions, contacts, addInteraction } = useCRM();
+  const { interactions, contacts } = useCRM();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');

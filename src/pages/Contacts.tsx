@@ -1,13 +1,14 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useCRM } from '../context/CRMContext'
 import { ContactForm } from '../components/ContactForm'
-import { Plus, Search, Mail, Phone, Building, Calendar, MessageCircle } from 'lucide-react'
+import { Plus, Search, Mail, Phone, Building, Calendar, MessageCircle, Users } from 'lucide-react'
 import { format } from 'date-fns'
+import { Contact } from '../types'
 
 export function Contacts() {
   const { contacts, deleteContact } = useCRM();
   const [showForm, setShowForm] = useState(false);
-  const [editingContact, setEditingContact] = useState(null);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredContacts = contacts.filter(contact =>
@@ -16,7 +17,7 @@ export function Contacts() {
     contact.company?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEdit = (contact) => {
+  const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
     setShowForm(true);
   };
