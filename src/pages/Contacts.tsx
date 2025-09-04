@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useCRM } from '../context/CRMContext'
 import { ContactForm } from '../components/ContactForm'
-import { Plus, Search, Mail, Phone, Building, Calendar, MessageCircle } from 'lucide-react'
+import { Plus, Search, Mail, Phone, Building, Calendar, MessageCircle, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 export function Contacts() {
