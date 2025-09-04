@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { Contact, Interaction, Task, User, DashboardStats } from '../types'
-import { mockData } from '../data/mockData'
+import { contactsAPI, interactionsAPI, tasksAPI, userAPI, APIError } from '../services/api'
+import { useAuth } from '../hooks/useAuth'
+import toast from 'react-hot-toast'
 
 interface CRMContextType {
   user: User | null;
@@ -8,22 +10,28 @@ interface CRMContextType {
   interactions: Interaction[];
   tasks: Task[];
   stats: DashboardStats;
-  addContact: (contact: Omit<Contact, 'contactId' | 'createdAt'>) => void;
-  updateContact: (contactId: string, updates: Partial<Contact>) => void;
-  deleteContact: (contactId: string) => void;
-  addInteraction: (interaction: Omit<Interaction, 'interactionId' | 'createdAt'>) => void;
-  addTask: (task: Omit<Task, 'taskId' | 'createdAt'>) => void;
-  updateTask: (taskId: string, updates: Partial<Task>) => void;
-  deleteTask: (taskId: string) => void;
+  loading: boolean;
+  error: string | null;
+  addContact: (contact: Omit<Contact, 'contactId' | 'createdAt' | 'userId' | 'totalInteractions'>) => Promise<void>;
+  updateContact: (contactId: string, updates: Partial<Contact>) => Promise<void>;
+  deleteContact: (contactId: string) => Promise<void>;
+  addInteraction: (interaction: Omit<Interaction, 'interactionId' | 'createdAt' | 'userId'>) => Promise<void>;
+  addTask: (task: Omit<Task, 'taskId' | 'createdAt' | 'userId'>) => Promise<void>;
+  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
 
 export function CRMProvider({ children }: { children: ReactNode }) {
-  const [user] = useState<User>(mockData.user);
-  const [contacts, setContacts] = useState<Contact[]>(mockData.contacts);
-  const [interactions, setInteractions] = useState<Interaction[]>(mockData.interactions);
-  const [tasks, setTasks] = useState<Task[]>(mockData.tasks);
+  const { user: authUser, isAuthenticated } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalContacts: 0,
     totalInteractions: 0,
@@ -31,6 +39,20 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     thisWeekInteractions: 0
   });
 
+  // Load data when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && authUser) {
+      refreshData();
+    } else {
+      // Clear data when user logs out
+      setUser(null);
+      setContacts([]);
+      setInteractions([]);
+      setTasks([]);
+    }
+  }, [isAuthenticated, authUser]);
+
+  // Calculate stats whenever data changes
   useEffect(() => {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -43,56 +65,134 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     });
   }, [contacts, interactions, tasks]);
 
-  const addContact = (contactData: Omit<Contact, 'contactId' | 'createdAt'>) => {
-    const newContact: Contact = {
-      ...contactData,
-      contactId: `contact_${Date.now()}`,
-      createdAt: new Date(),
-      totalInteractions: 0
-    };
-    setContacts(prev => [...prev, newContact]);
+  const handleError = (error: unknown, action: string) => {
+    const message = error instanceof APIError ? error.message : `Failed to ${action}`;
+    setError(message);
+    toast.error(message);
+    console.error(`Error ${action}:`, error);
   };
 
-  const updateContact = (contactId: string, updates: Partial<Contact>) => {
-    setContacts(prev => prev.map(c => c.contactId === contactId ? { ...c, ...updates } : c));
+  const refreshData = async () => {
+    if (!isAuthenticated) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [userData, contactsData, interactionsData, tasksData] = await Promise.all([
+        userAPI.getCurrentUser(),
+        contactsAPI.getContacts(),
+        interactionsAPI.getInteractions(),
+        tasksAPI.getTasks()
+      ]);
+
+      setUser(userData);
+      setContacts(contactsData);
+      setInteractions(interactionsData);
+      setTasks(tasksData);
+    } catch (error) {
+      handleError(error, 'load data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteContact = (contactId: string) => {
-    setContacts(prev => prev.filter(c => c.contactId !== contactId));
-    setInteractions(prev => prev.filter(i => i.contactId !== contactId));
-    setTasks(prev => prev.filter(t => t.contactId !== contactId));
+  const addContact = async (contactData: Omit<Contact, 'contactId' | 'createdAt' | 'userId' | 'totalInteractions'>) => {
+    try {
+      setError(null);
+      const newContact = await contactsAPI.createContact(contactData);
+      setContacts(prev => [newContact, ...prev]);
+      toast.success('Contact added successfully');
+    } catch (error) {
+      handleError(error, 'add contact');
+      throw error;
+    }
   };
 
-  const addInteraction = (interactionData: Omit<Interaction, 'interactionId' | 'createdAt'>) => {
-    const newInteraction: Interaction = {
-      ...interactionData,
-      interactionId: `interaction_${Date.now()}`,
-      createdAt: new Date()
-    };
-    setInteractions(prev => [...prev, newInteraction]);
-    
-    // Update contact's last interaction and total count
-    updateContact(interactionData.contactId, {
-      lastInteraction: interactionData.dateTime,
-      totalInteractions: contacts.find(c => c.contactId === interactionData.contactId)?.totalInteractions + 1 || 1
-    });
+  const updateContact = async (contactId: string, updates: Partial<Contact>) => {
+    try {
+      setError(null);
+      const updatedContact = await contactsAPI.updateContact(contactId, updates);
+      setContacts(prev => prev.map(c => c.contactId === contactId ? updatedContact : c));
+      toast.success('Contact updated successfully');
+    } catch (error) {
+      handleError(error, 'update contact');
+      throw error;
+    }
   };
 
-  const addTask = (taskData: Omit<Task, 'taskId' | 'createdAt'>) => {
-    const newTask: Task = {
-      ...taskData,
-      taskId: `task_${Date.now()}`,
-      createdAt: new Date()
-    };
-    setTasks(prev => [...prev, newTask]);
+  const deleteContact = async (contactId: string) => {
+    try {
+      setError(null);
+      await contactsAPI.deleteContact(contactId);
+      setContacts(prev => prev.filter(c => c.contactId !== contactId));
+      setInteractions(prev => prev.filter(i => i.contactId !== contactId));
+      setTasks(prev => prev.filter(t => t.contactId !== contactId));
+      toast.success('Contact deleted successfully');
+    } catch (error) {
+      handleError(error, 'delete contact');
+      throw error;
+    }
   };
 
-  const updateTask = (taskId: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(t => t.taskId === taskId ? { ...t, ...updates } : t));
+  const addInteraction = async (interactionData: Omit<Interaction, 'interactionId' | 'createdAt' | 'userId'>) => {
+    try {
+      setError(null);
+      const newInteraction = await interactionsAPI.createInteraction(interactionData);
+      setInteractions(prev => [newInteraction, ...prev]);
+      
+      // Update contact stats locally for immediate UI feedback
+      setContacts(prev => prev.map(c => 
+        c.contactId === interactionData.contactId 
+          ? { 
+              ...c, 
+              lastInteraction: interactionData.dateTime,
+              totalInteractions: c.totalInteractions + 1
+            }
+          : c
+      ));
+      
+      toast.success('Interaction logged successfully');
+    } catch (error) {
+      handleError(error, 'add interaction');
+      throw error;
+    }
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(t => t.taskId !== taskId));
+  const addTask = async (taskData: Omit<Task, 'taskId' | 'createdAt' | 'userId'>) => {
+    try {
+      setError(null);
+      const newTask = await tasksAPI.createTask(taskData);
+      setTasks(prev => [newTask, ...prev]);
+      toast.success('Task created successfully');
+    } catch (error) {
+      handleError(error, 'add task');
+      throw error;
+    }
+  };
+
+  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    try {
+      setError(null);
+      const updatedTask = await tasksAPI.updateTask(taskId, updates);
+      setTasks(prev => prev.map(t => t.taskId === taskId ? updatedTask : t));
+      toast.success('Task updated successfully');
+    } catch (error) {
+      handleError(error, 'update task');
+      throw error;
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    try {
+      setError(null);
+      await tasksAPI.deleteTask(taskId);
+      setTasks(prev => prev.filter(t => t.taskId !== taskId));
+      toast.success('Task deleted successfully');
+    } catch (error) {
+      handleError(error, 'delete task');
+      throw error;
+    }
   };
 
   return (
@@ -102,13 +202,16 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       interactions,
       tasks,
       stats,
+      loading,
+      error,
       addContact,
       updateContact,
       deleteContact,
       addInteraction,
       addTask,
       updateTask,
-      deleteTask
+      deleteTask,
+      refreshData
     }}>
       {children}
     </CRMContext.Provider>

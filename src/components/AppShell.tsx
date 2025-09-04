@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react'
+import React, { ReactNode, useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { 
   LayoutDashboard, 
@@ -9,9 +9,13 @@ import {
   Bell,
   Search,
   Menu,
-  X
+  X,
+  LogOut,
+  User,
+  ChevronDown
 } from 'lucide-react'
-import { useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
+import { useCRM } from '../context/CRMContext'
 
 interface AppShellProps {
   children: ReactNode;
@@ -20,6 +24,10 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { signOut } = useAuth();
+  const { user } = useCRM();
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -29,6 +37,36 @@ export function AppShell({ children }: AppShellProps) {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const getUserInitials = () => {
+    if (!user?.name) return 'U';
+    return user.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <div className="flex h-screen bg-dark-950">
@@ -86,11 +124,25 @@ export function AppShell({ children }: AppShellProps) {
           </ul>
         </nav>
 
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-4 left-4 right-4 space-y-2">
           <button className="flex items-center px-3 py-2 w-full text-dark-300 hover:text-white hover:bg-dark-700 rounded-md transition-colors duration-200">
             <Settings size={18} className="mr-3" />
             Settings
           </button>
+          
+          {user && (
+            <div className="border-t border-dark-700 pt-2">
+              <div className="flex items-center px-3 py-2 text-dark-300">
+                <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center mr-3">
+                  <span className="text-white font-medium text-sm">{getUserInitials()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{user.name}</p>
+                  <p className="text-xs text-dark-400 truncate">{user.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -122,9 +174,46 @@ export function AppShell({ children }: AppShellProps) {
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
             
-            <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-              <span className="text-white font-medium text-sm">JD</span>
-            </div>
+            {user && (
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center space-x-2 text-dark-300 hover:text-white transition-colors"
+                >
+                  <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
+                    <span className="text-white font-medium text-sm">{getUserInitials()}</span>
+                  </div>
+                  <ChevronDown size={16} className={`transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-dark-800 border border-dark-700 rounded-md shadow-lg z-50">
+                    <div className="px-4 py-3 border-b border-dark-700">
+                      <p className="text-sm font-medium text-white">{user.name}</p>
+                      <p className="text-xs text-dark-400">{user.email}</p>
+                    </div>
+                    <div className="py-1">
+                      <button className="flex items-center w-full px-4 py-2 text-sm text-dark-300 hover:text-white hover:bg-dark-700 transition-colors">
+                        <User size={16} className="mr-3" />
+                        Profile
+                      </button>
+                      <button className="flex items-center w-full px-4 py-2 text-sm text-dark-300 hover:text-white hover:bg-dark-700 transition-colors">
+                        <Settings size={16} className="mr-3" />
+                        Settings
+                      </button>
+                      <hr className="border-dark-700 my-1" />
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-dark-700 transition-colors"
+                      >
+                        <LogOut size={16} className="mr-3" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
